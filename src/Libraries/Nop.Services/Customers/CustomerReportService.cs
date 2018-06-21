@@ -128,14 +128,14 @@ namespace Nop.Services.Customers
         {
             var date = _dateTimeHelper.ConvertToUserTime(DateTime.Now).AddDays(-days);
 
-            var registeredCustomerRole = _customerService.GetCustomerRoleBySystemName(SystemCustomerRoleNames.Registered);
+            var registeredCustomerRole = _customerService.GetCustomerRoleBySystemName(NopCustomerDefaults.RegisteredRoleName);
             if (registeredCustomerRole == null)
                 return 0;
 
             var query = from c in _customerRepository.Table
-                        from cr in c.CustomerRoles
+                        from mapping in c.CustomerCustomerRoleMappings
                         where !c.Deleted &&
-                        cr.Id == registeredCustomerRole.Id &&
+                        mapping.CustomerRoleId == registeredCustomerRole.Id &&
                         c.CreatedOnUtc >= date 
                         //&& c.CreatedOnUtc <= DateTime.UtcNow
                         select c;

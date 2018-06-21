@@ -23,8 +23,8 @@ using Nop.Services.Orders;
 using Nop.Services.Payments;
 using Nop.Services.Security;
 using Nop.Services.Shipping;
-using Nop.Web.Areas.Admin.Extensions;
 using Nop.Web.Areas.Admin.Factories;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
 using Nop.Web.Areas.Admin.Models.Orders;
 using Nop.Web.Extensions;
 using Nop.Web.Framework.Controllers;
@@ -420,7 +420,7 @@ namespace Nop.Web.Areas.Admin.Controllers
             return RedirectToAction("List");
         }
 
-        public virtual IActionResult List(List<int> orderStatusIds = null, List<int> paymentStatusIds = null, List<int> shippingStatusIds = null)
+        public virtual IActionResult List(List<int> orderStatuses = null, List<int> paymentStatuses = null, List<int> shippingStatuses = null)
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageOrders))
                 return AccessDeniedView();
@@ -428,9 +428,9 @@ namespace Nop.Web.Areas.Admin.Controllers
             //prepare model
             var model = _orderModelFactory.PrepareOrderSearchModel(new OrderSearchModel
             {
-                OrderStatusIds = orderStatusIds,
-                PaymentStatusIds = paymentStatusIds,
-                ShippingStatusIds = shippingStatusIds
+                OrderStatusIds = orderStatuses,
+                PaymentStatusIds = paymentStatuses,
+                ShippingStatusIds = shippingStatuses
             });
 
             return View(model);

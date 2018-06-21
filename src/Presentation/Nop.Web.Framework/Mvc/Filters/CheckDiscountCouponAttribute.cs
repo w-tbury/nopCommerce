@@ -73,7 +73,7 @@ namespace Nop.Web.Framework.Mvc.Filters
                 if (!context.HttpContext.Request.Method.Equals(WebRequestMethods.Http.Get, StringComparison.InvariantCultureIgnoreCase))
                     return;
 
-                if (!DataSettingsHelper.DatabaseIsInstalled())
+                if (!DataSettingsManager.DatabaseIsInstalled)
                     return;
                 
                 //ignore search engines
@@ -81,7 +81,7 @@ namespace Nop.Web.Framework.Mvc.Filters
                     return;
 
                 //try to get discount coupon code
-                var queryKey = NopServicesDefaults.DiscountCouponQueryParameter;
+                var queryKey = NopDiscountDefaults.DiscountCouponQueryParameter;
                 if (!context.HttpContext.Request.Query.TryGetValue(queryKey, out StringValues couponCodes) || StringValues.IsNullOrEmpty(couponCodes))
                     return;
 

@@ -27,8 +27,8 @@ using Nop.Services.Security;
 using Nop.Services.Seo;
 using Nop.Services.Shipping;
 using Nop.Services.Stores;
-using Nop.Web.Areas.Admin.Extensions;
 using Nop.Web.Areas.Admin.Factories;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
 using Nop.Web.Areas.Admin.Models.Catalog;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc;
@@ -336,14 +336,17 @@ namespace Nop.Web.Areas.Admin.Controllers
                 if (model.SelectedDiscountIds != null && model.SelectedDiscountIds.Contains(discount.Id))
                 {
                     //new discount
-                    if (product.AppliedDiscounts.Count(d => d.Id == discount.Id) == 0)
-                        product.AppliedDiscounts.Add(discount);
+                    if (product.DiscountProductMappings.Count(mapping => mapping.DiscountId == discount.Id) == 0)
+                        product.DiscountProductMappings.Add(new DiscountProductMapping { Discount = discount });
                 }
                 else
                 {
                     //remove discount
-                    if (product.AppliedDiscounts.Count(d => d.Id == discount.Id) > 0)
-                        product.AppliedDiscounts.Remove(discount);
+                    if (product.DiscountProductMappings.Count(mapping => mapping.DiscountId == discount.Id) > 0)
+                    {
+                        product.DiscountProductMappings
+                            .Remove(product.DiscountProductMappings.FirstOrDefault(mapping => mapping.DiscountId == discount.Id));
+                    }
                 }
             }
 
@@ -830,7 +833,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                     model.ShowOnHomePage = false;
 
                 //product
-                var product = model.ToEntity();
+                var product = model.ToEntity<Product>();
                 product.CreatedOnUtc = DateTime.UtcNow;
                 product.UpdatedOnUtc = DateTime.UtcNow;
                 _productService.InsertProduct(product);
@@ -3376,7 +3379,7 @@ namespace Nop.Web.Areas.Admin.Controllers
                 return RedirectToAction("List");
 
             var productEditorSettings = _settingService.LoadSetting<ProductEditorSettings>();
-            productEditorSettings = model.ProductEditorSettingsModel.ToEntity(productEditorSettings);
+            productEditorSettings = model.ProductEditorSettingsModel.ToSettings(productEditorSettings);
             _settingService.SaveSetting(productEditorSettings);
 
             //product list

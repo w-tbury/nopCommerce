@@ -2869,16 +2869,16 @@ label, label + * {
 #check-availability-button:hover {
 	background-color: #999;
 }
-.accept-privacy-policy {
+.accept-consent {
 	margin: 0 0 20px;
 	text-align: center;
 }
-.accept-privacy-policy > * {
+.accept-consent > * {
 	display: inline-block;
 	line-height: 32px;
 }
-.accept-privacy-policy span,
-.accept-privacy-policy a {
+.accept-consent span,
+.accept-consent a {
 	color: #4ab2f1;
 	cursor: pointer;
 }
@@ -3060,6 +3060,15 @@ label, label + * {
 	margin: 0 0 30px
 }
 
+.gdpr-tools-page .result {
+    margin: 20px 0;
+    font-size: 13px;
+    color: #e4434b;
+}
+.gdpr-tools-page .buttons {
+    margin-top: 20px;
+}
+
 .address-list-page .info,
 .order-list-page .info {
 	margin: 0 0 10px;
@@ -3236,6 +3245,18 @@ label, label + * {
     margin-top: 15px;
 }
 
+.check-gift-card-balance-page .page-title {
+    margin: 0 0 -1px;
+}
+
+.check-gift-card-balance-page .result,
+.check-gift-card-balance-page .message-error {
+    margin: 20px 0;
+}
+
+.check-gift-card-balance-page .fieldset {
+    margin: 0 0 30px;
+}
 
 /********** SHOPPING CART **********/
 

@@ -8,6 +8,7 @@ using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Logging;
 using Nop.Data;
+using Nop.Data.Extensions;
 
 namespace Nop.Services.Logging
 {
@@ -16,19 +17,6 @@ namespace Nop.Services.Logging
     /// </summary>
     public class CustomerActivityService : ICustomerActivityService
     {
-        #region Constants
-
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        private const string ACTIVITYTYPE_ALL_KEY = "Nop.activitytype.all";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string ACTIVITYTYPE_PATTERN_KEY = "Nop.activitytype.";
-
-        #endregion
-
         #region Fields
 
         private readonly IStaticCacheManager _cacheManager;
@@ -112,8 +100,7 @@ namespace Nop.Services.Logging
         protected virtual IList<ActivityLogTypeForCaching> GetAllActivityTypesCached()
         {
             //cache
-            var key = string.Format(ACTIVITYTYPE_ALL_KEY);
-            return _cacheManager.Get(key, () =>
+            return _cacheManager.Get(NopLoggingDefaults.ActivityTypeAllCacheKey, () =>
             {
                 var result = new List<ActivityLogTypeForCaching>();
                 var activityLogTypes = GetAllActivityTypes();
@@ -146,7 +133,7 @@ namespace Nop.Services.Logging
                 throw new ArgumentNullException(nameof(activityLogType));
 
             _activityLogTypeRepository.Insert(activityLogType);
-            _cacheManager.RemoveByPattern(ACTIVITYTYPE_PATTERN_KEY);
+            _cacheManager.RemoveByPattern(NopLoggingDefaults.ActivityTypePatternCacheKey);
         }
 
         /// <summary>
@@ -159,7 +146,7 @@ namespace Nop.Services.Logging
                 throw new ArgumentNullException(nameof(activityLogType));
 
             _activityLogTypeRepository.Update(activityLogType);
-            _cacheManager.RemoveByPattern(ACTIVITYTYPE_PATTERN_KEY);
+            _cacheManager.RemoveByPattern(NopLoggingDefaults.ActivityTypePatternCacheKey);
         }
                 
         /// <summary>
@@ -172,7 +159,7 @@ namespace Nop.Services.Logging
                 throw new ArgumentNullException(nameof(activityLogType));
 
             _activityLogTypeRepository.Delete(activityLogType);
-            _cacheManager.RemoveByPattern(ACTIVITYTYPE_PATTERN_KEY);
+            _cacheManager.RemoveByPattern(NopLoggingDefaults.ActivityTypePatternCacheKey);
         }
 
         /// <summary>
@@ -325,22 +312,13 @@ namespace Nop.Services.Logging
         /// </summary>
         public virtual void ClearAllActivities()
         {
-            if (_commonSettings.UseStoredProceduresIfSupported && _dataProvider.StoredProceduredSupported)
-            {
-                //although it's not a stored procedure we use it to ensure that a database supports them
-                //we cannot wait until EF team has it implemented - http://data.uservoice.com/forums/72025-entity-framework-feature-suggestions/suggestions/1015357-batch-cud-support
+            //do all databases support "Truncate command"?
+            var activityLogTableName = _dbContext.GetTableName<ActivityLog>();
+            _dbContext.ExecuteSqlCommand($"TRUNCATE TABLE [{activityLogTableName}]");
 
-
-                //do all databases support "Truncate command"?
-                var activityLogTableName = _dbContext.GetTableName<ActivityLog>();
-                _dbContext.ExecuteSqlCommand($"TRUNCATE TABLE [{activityLogTableName}]");
-            }
-            else
-            {
-                var activityLog = _activityLogRepository.Table.ToList();
-                foreach (var activityLogItem in activityLog)
-                    _activityLogRepository.Delete(activityLogItem);
-            }
+            //var activityLog = _activityLogRepository.Table.ToList();
+            //foreach (var activityLogItem in activityLog)
+            //    _activityLogRepository.Delete(activityLogItem);
         }
 
         #endregion

@@ -56,7 +56,7 @@ namespace Nop.Services.Discounts
         /// <param name="localizationService">Localization service</param>
         /// <param name="categoryService">Category service</param>
         /// <param name="pluginFinder">Plugin finder</param>
-        /// <param name="eventPublisher">Event published</param>
+        /// <param name="eventPublisher">Event publisher</param>
         public DiscountService(IStaticCacheManager cacheManager,
             IRepository<Discount> discountRepository,
             IRepository<DiscountRequirement> discountRequirementRepository,
@@ -242,11 +242,9 @@ namespace Nop.Services.Discounts
 
             if (!showHidden)
             {
-                //The function 'CurrentUtcDateTime' is not supported by SQL Server Compact, that's why we pass the date value
-                var nowUtc = DateTime.UtcNow;
                 query = query.Where(discount => 
-                    (!discount.StartDateUtc.HasValue || discount.StartDateUtc <= nowUtc)  && 
-                    (!discount.EndDateUtc.HasValue || discount.EndDateUtc >= nowUtc));
+                    (!discount.StartDateUtc.HasValue || discount.StartDateUtc <= DateTime.UtcNow)  && 
+                    (!discount.EndDateUtc.HasValue || discount.EndDateUtc >= DateTime.UtcNow));
             }
 
             //filter by dates
@@ -316,7 +314,7 @@ namespace Nop.Services.Discounts
             var categories = _categoryRepository.Table;
 
             if (discountId.HasValue)
-                categories = categories.Where(category => category.AppliedDiscounts.Any(discount => discount.Id == discountId.Value));
+                categories = categories.Where(category => category.DiscountCategoryMappings.Any(mapping => mapping.DiscountId == discountId.Value));
 
             if (!showHidden)
                 categories = categories.Where(category => !category.Deleted);
@@ -340,7 +338,7 @@ namespace Nop.Services.Discounts
             var manufacturers = _manufacturerRepository.Table;
 
             if (discountId.HasValue)
-                manufacturers = manufacturers.Where(manufacturer => manufacturer.AppliedDiscounts.Any(discount => discount.Id == discountId.Value));
+                manufacturers = manufacturers.Where(manufacturer => manufacturer.DiscountManufacturerMappings.Any(mapping => mapping.DiscountId == discountId.Value));
 
             if (!showHidden)
                 manufacturers = manufacturers.Where(manufacturer => !manufacturer.Deleted);
@@ -365,7 +363,7 @@ namespace Nop.Services.Discounts
             var products = _productRepository.Table.Where(product => product.HasDiscountsApplied);
 
             if (discountId.HasValue)
-                products = products.Where(product => product.AppliedDiscounts.Any(discount => discount.Id == discountId.Value));
+                products = products.Where(product => product.DiscountProductMappings.Any(mapping => mapping.DiscountId == discountId.Value));
 
             if (!showHidden)
                 products = products.Where(product => !product.Deleted);
@@ -397,7 +395,7 @@ namespace Nop.Services.Discounts
             //we load all discounts, and filter them using "discountType" parameter later (in memory)
             //we do it because we know that this method is invoked several times per HTTP request with distinct "discountType" parameter
             //that's why let's access the database only once
-            var cacheKey = string.Format(DiscountEventConsumer.DISCOUNT_ALL_KEY, 
+            var cacheKey = string.Format(NopDiscountDefaults.DiscountAllCacheKey, 
                 showHidden, couponCode ?? string.Empty, discountName ?? string.Empty);
             var discounts = _cacheManager.Get(cacheKey, () =>
             {
@@ -425,7 +423,7 @@ namespace Nop.Services.Discounts
                 throw new ArgumentNullException(nameof(discount));
 
             var discountId = discount.Id;
-            var cacheKey = string.Format(DiscountEventConsumer.DISCOUNT_CATEGORY_IDS_MODEL_KEY,
+            var cacheKey = string.Format(NopDiscountDefaults.DiscountCategoryIdsModelCacheKey,
                 discountId,
                 string.Join(",", customer.GetCustomerRoleIds()),
                 _storeContext.CurrentStore.Id);
@@ -433,7 +431,7 @@ namespace Nop.Services.Discounts
             {
                 var ids = new List<int>();
                 var rootCategoryIds = _discountRepository.Table.Where(x => x.Id == discountId)
-                        .SelectMany(x => x.AppliedToCategories.Select(c => c.Id))
+                        .SelectMany(x => x.DiscountCategoryMappings.Select(mapping => mapping.CategoryId))
                         .ToList();
                 foreach (var categoryId in rootCategoryIds)
                 {
@@ -467,14 +465,14 @@ namespace Nop.Services.Discounts
                 throw new ArgumentNullException(nameof(discount));
 
             var discountId = discount.Id;
-            var cacheKey = string.Format(DiscountEventConsumer.DISCOUNT_MANUFACTURER_IDS_MODEL_KEY,
+            var cacheKey = string.Format(NopDiscountDefaults.DiscountManufacturerIdsModelCacheKey,
                 discountId,
                 string.Join(",", customer.GetCustomerRoleIds()),
                 _storeContext.CurrentStore.Id);
             var result = _cacheManager.Get(cacheKey, () =>
             {
                 return _discountRepository.Table.Where(x => x.Id == discountId)
-                    .SelectMany(x => x.AppliedToManufacturers.Select(c => c.Id))
+                    .SelectMany(x => x.DiscountManufacturerMappings.Select(mapping => mapping.ManufacturerId))
                     .ToList();
             });
 
@@ -697,7 +695,7 @@ namespace Nop.Services.Discounts
             }
 
             //discount requirements
-            var key = string.Format(DiscountEventConsumer.DISCOUNT_REQUIREMENT_MODEL_KEY, discount.Id);
+            var key = string.Format(NopDiscountDefaults.DiscountRequirementModelCacheKey, discount.Id);
             var requirementsForCaching = _cacheManager.Get(key, () =>
             {
                 var requirements = GetAllDiscountRequirements(discount.Id, true);

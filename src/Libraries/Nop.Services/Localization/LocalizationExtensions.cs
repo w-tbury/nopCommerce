@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
 using Nop.Core;
@@ -7,7 +8,7 @@ using Nop.Core.Domain.Localization;
 using Nop.Core.Domain.Security;
 using Nop.Core.Infrastructure;
 using Nop.Core.Plugins;
-using Nop.Data;
+using Nop.Data.Extensions;
 using Nop.Services.Configuration;
 
 namespace Nop.Services.Localization
@@ -206,7 +207,7 @@ namespace Nop.Services.Localization
             if (!typeof(T).IsEnum) throw new ArgumentException("T must be an enumerated type");
 
             //localized value
-            var resourceName = $"Enums.{typeof(T)}.{enumValue}";
+            var resourceName = $"{NopLocalizationDefaults.EnumLocaleStringResourcesPrefix}{typeof(T)}.{enumValue}";
             var result = localizationService.GetResource(resourceName, languageId, false, "", true);
 
             //set default value if required
@@ -251,7 +252,7 @@ namespace Nop.Services.Localization
                 throw new ArgumentNullException(nameof(localizationService));
 
             //localized value
-            var resourceName = $"Permission.{permissionRecord.SystemName}";
+            var resourceName = $"{NopLocalizationDefaults.PermissionLocaleStringResourcesPrefix}{permissionRecord.SystemName}";
             var result = localizationService.GetResource(resourceName, languageId, false, "", true);
 
             //set default value if required
@@ -277,7 +278,7 @@ namespace Nop.Services.Localization
             if (languageService == null)
                 throw new ArgumentNullException(nameof(languageService));
 
-            var resourceName = $"Permission.{permissionRecord.SystemName}";
+            var resourceName = $"{NopLocalizationDefaults.PermissionLocaleStringResourcesPrefix}{permissionRecord.SystemName}";
             var resourceValue = permissionRecord.Name;
 
             foreach (var lang in languageService.GetAllLanguages(true))
@@ -317,7 +318,7 @@ namespace Nop.Services.Localization
             if (languageService == null)
                 throw new ArgumentNullException(nameof(languageService));
 
-            var resourceName = $"Permission.{permissionRecord.SystemName}";
+            var resourceName = $"{NopLocalizationDefaults.PermissionLocaleStringResourcesPrefix}{permissionRecord.SystemName}";
             foreach (var lang in languageService.GetAllLanguages(true))
             {
                 var lsr = localizationService.GetLocaleStringResourceByName(resourceName, lang.Id, false);
@@ -452,7 +453,7 @@ namespace Nop.Services.Localization
 
             var systemName = plugin.PluginDescriptor.SystemName;
             //localized value
-            var resourceName = $"Plugins.FriendlyName.{systemName}";
+            var resourceName = $"{NopLocalizationDefaults.PluginNameLocaleStringResourcesPrefix}{systemName}";
             var result = localizationService.GetResource(resourceName, languageId, false, "", true);
 
             //set default value if required
@@ -489,7 +490,7 @@ namespace Nop.Services.Localization
 
             var systemName = plugin.PluginDescriptor.SystemName;
             //localized value
-            var resourceName = $"Plugins.FriendlyName.{systemName}";
+            var resourceName = $"{NopLocalizationDefaults.PluginNameLocaleStringResourcesPrefix}{systemName}";
             var resource = localizationService.GetLocaleStringResourceByName(resourceName, languageId, false);
 
             if (resource != null)
@@ -520,6 +521,27 @@ namespace Nop.Services.Localization
                 };
                 localizationService.InsertLocaleStringResource(resource);
             }
+        }
+
+        /// <summary>
+        /// Get 2 letter ISO language code
+        /// </summary>
+        /// <param name="language"></param>
+        /// <returns></returns>
+        public static string GetTwoLetterIsoLanguageName(this Language language)
+        {
+            if (language == null)
+                throw new ArgumentNullException(nameof(language));
+
+            if (string.IsNullOrEmpty(language.LanguageCulture))
+                return "en";
+
+            var culture = new CultureInfo(language.LanguageCulture);
+            var code = culture.TwoLetterISOLanguageName;
+            if (String.IsNullOrEmpty(code))
+                return "en";
+
+            return code;
         }
     }
 }

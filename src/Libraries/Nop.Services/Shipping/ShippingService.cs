@@ -25,22 +25,6 @@ namespace Nop.Services.Shipping
     /// </summary>
     public partial class ShippingService : IShippingService
     {
-        #region Constants
-
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : warehouse ID
-        /// </remarks>
-        private const string WAREHOUSES_BY_ID_KEY = "Nop.warehouse.id-{0}";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string WAREHOUSES_PATTERN_KEY = "Nop.warehouse.";
-
-        #endregion
-
         #region Fields
 
         private readonly IRepository<ShippingMethod> _shippingMethodRepository;
@@ -78,7 +62,7 @@ namespace Nop.Services.Shipping
         /// <param name="shippingSettings">Shipping settings</param>
         /// <param name="pluginFinder">Plugin finder</param>
         /// <param name="storeContext">Store context</param>
-        /// <param name="eventPublisher">Event published</param>
+        /// <param name="eventPublisher">Event publisher</param>
         /// <param name="shoppingCartSettings">Shopping cart settings</param>
         /// <param name="cacheManager">Cache manager</param>
         public ShippingService(IRepository<ShippingMethod> shippingMethodRepository,
@@ -241,7 +225,7 @@ namespace Nop.Services.Shipping
             {
                 var query1 = from sm in _shippingMethodRepository.Table
                              where
-                             sm.RestrictedCountries.Select(c => c.Id).Contains(filterByCountryId.Value)
+                             sm.ShippingMethodCountryMappings.Select(mapping => mapping.CountryId).Contains(filterByCountryId.Value)
                              select sm.Id;
 
                 var query2 = from sm in _shippingMethodRepository.Table
@@ -308,7 +292,7 @@ namespace Nop.Services.Shipping
             _warehouseRepository.Delete(warehouse);
 
             //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
+            _cacheManager.RemoveByPattern(NopShippingDefaults.WarehousesPatternCacheKey);
 
             //event notification
             _eventPublisher.EntityDeleted(warehouse);
@@ -324,7 +308,7 @@ namespace Nop.Services.Shipping
             if (warehouseId == 0)
                 return null;
 
-            var key = string.Format(WAREHOUSES_BY_ID_KEY, warehouseId);
+            var key = string.Format(NopShippingDefaults.WarehousesByIdCacheKey, warehouseId);
             return _cacheManager.Get(key, () => _warehouseRepository.GetById(warehouseId));
         }
 
@@ -353,7 +337,7 @@ namespace Nop.Services.Shipping
             _warehouseRepository.Insert(warehouse);
 
             //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
+            _cacheManager.RemoveByPattern(NopShippingDefaults.WarehousesPatternCacheKey);
 
             //event notification
             _eventPublisher.EntityInserted(warehouse);
@@ -371,7 +355,7 @@ namespace Nop.Services.Shipping
             _warehouseRepository.Update(warehouse);
 
             //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
+            _cacheManager.RemoveByPattern(NopShippingDefaults.WarehousesPatternCacheKey);
 
             //event notification
             _eventPublisher.EntityUpdated(warehouse);
@@ -500,7 +484,7 @@ namespace Nop.Services.Shipping
             //checkout attributes
             if (request.Customer != null && includeCheckoutAttributes)
             {
-                var checkoutAttributesXml = request.Customer.GetAttribute<string>(SystemCustomerAttributeNames.CheckoutAttributes, _genericAttributeService, _storeContext.CurrentStore.Id);
+                var checkoutAttributesXml = request.Customer.GetAttribute<string>(NopCustomerDefaults.CheckoutAttributes, _genericAttributeService, _storeContext.CurrentStore.Id);
                 if (!string.IsNullOrEmpty(checkoutAttributesXml))
                 {
                     var attributeValues = _checkoutAttributeParser.ParseCheckoutAttributeValues(checkoutAttributesXml);

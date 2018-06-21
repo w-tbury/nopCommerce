@@ -8,6 +8,7 @@ using Nop.Core;
 using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Customers;
+using Nop.Core.Domain.Gdpr;
 using Nop.Core.Domain.Media;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
@@ -19,6 +20,7 @@ using Nop.Services.Catalog;
 using Nop.Services.Common;
 using Nop.Services.Customers;
 using Nop.Services.Directory;
+using Nop.Services.Gdpr;
 using Nop.Services.Helpers;
 using Nop.Services.Localization;
 using Nop.Services.Logging;
@@ -27,7 +29,7 @@ using Nop.Services.Messages;
 using Nop.Services.Orders;
 using Nop.Services.Stores;
 using Nop.Services.Tax;
-using Nop.Web.Areas.Admin.Extensions;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
 using Nop.Web.Areas.Admin.Models.Common;
 using Nop.Web.Areas.Admin.Models.Customers;
 using Nop.Web.Areas.Admin.Models.ShoppingCart;
@@ -46,8 +48,10 @@ namespace Nop.Web.Areas.Admin.Factories
         private readonly AddressSettings _addressSettings;
         private readonly CustomerSettings _customerSettings;
         private readonly DateTimeSettings _dateTimeSettings;
+        private readonly GdprSettings _gdprSettings;
         private readonly IAclSupportedModelFactory _aclSupportedModelFactory;
         private readonly IAddressAttributeFormatter _addressAttributeFormatter;
+        private readonly IAddressAttributeModelFactory _addressAttributeModelFactory;
         private readonly IAddressAttributeParser _addressAttributeParser;
         private readonly IAddressAttributeService _addressAttributeService;
         private readonly IAffiliateService _affiliateService;
@@ -60,6 +64,7 @@ namespace Nop.Web.Areas.Admin.Factories
         private readonly ICustomerService _customerService;
         private readonly IDateTimeHelper _dateTimeHelper;
         private readonly IExternalAuthenticationService _externalAuthenticationService;
+        private readonly IGdprService _gdprService;
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly IGeoLookupService _geoLookupService;
         private readonly ILocalizationService _localizationService;
@@ -85,8 +90,10 @@ namespace Nop.Web.Areas.Admin.Factories
         public CustomerModelFactory(AddressSettings addressSettings,
             CustomerSettings customerSettings,
             DateTimeSettings dateTimeSettings,
+            GdprSettings gdprSettings,
             IAclSupportedModelFactory aclSupportedModelFactory,
             IAddressAttributeFormatter addressAttributeFormatter,
+            IAddressAttributeModelFactory addressAttributeModelFactory,
             IAddressAttributeParser addressAttributeParser,
             IAddressAttributeService addressAttributeService,
             IAffiliateService affiliateService,
@@ -99,6 +106,7 @@ namespace Nop.Web.Areas.Admin.Factories
             ICustomerService customerService,
             IDateTimeHelper dateTimeHelper,
             IExternalAuthenticationService externalAuthenticationService,
+            IGdprService gdprService,
             IGenericAttributeService genericAttributeService,
             IGeoLookupService geoLookupService,
             ILocalizationService localizationService,
@@ -120,8 +128,10 @@ namespace Nop.Web.Areas.Admin.Factories
             this._addressSettings = addressSettings;
             this._customerSettings = customerSettings;
             this._dateTimeSettings = dateTimeSettings;
+            this._gdprSettings = gdprSettings;
             this._aclSupportedModelFactory = aclSupportedModelFactory;
             this._addressAttributeFormatter = addressAttributeFormatter;
+            this._addressAttributeModelFactory = addressAttributeModelFactory;
             this._addressAttributeParser = addressAttributeParser;
             this._addressAttributeService = addressAttributeService;
             this._affiliateService = affiliateService;
@@ -134,6 +144,7 @@ namespace Nop.Web.Areas.Admin.Factories
             this._customerService = customerService;
             this._dateTimeHelper = dateTimeHelper;
             this._externalAuthenticationService = externalAuthenticationService;
+            this._gdprService = gdprService;
             this._genericAttributeService = genericAttributeService;
             this._geoLookupService = geoLookupService;
             this._localizationService = localizationService;
@@ -246,7 +257,7 @@ namespace Nop.Web.Areas.Admin.Factories
                 if (customer != null)
                 {
                     var selectedCustomerAttributes = customer
-                        .GetAttribute<string>(SystemCustomerAttributeNames.CustomCustomerAttributes, _genericAttributeService);
+                        .GetAttribute<string>(NopCustomerDefaults.CustomCustomerAttributes, _genericAttributeService);
                     switch (attribute.AttributeControlType)
                     {
                         case AttributeControlType.DropdownList:
@@ -343,7 +354,7 @@ namespace Nop.Web.Areas.Admin.Factories
             _baseAdminModelFactory.PrepareStatesAndProvinces(model.AvailableStates, model.CountryId);
 
             //prepare custom address attributes
-            model.PrepareCustomAddressAttributes(address, _addressAttributeService, _addressAttributeParser);
+            _addressAttributeModelFactory.PrepareCustomAddressAttributes(model.CustomAddressAttributes, address);
         }
 
         /// <summary>
@@ -591,7 +602,7 @@ namespace Nop.Web.Areas.Admin.Factories
             searchModel.ZipPostalCodeEnabled = _customerSettings.ZipPostalCodeEnabled;
 
             //search registered customers by default
-            var registeredRole = _customerService.GetCustomerRoleBySystemName(SystemCustomerRoleNames.Registered);
+            var registeredRole = _customerService.GetCustomerRoleBySystemName(NopCustomerDefaults.RegisteredRoleName);
             if (registeredRole != null)
                 searchModel.SelectedCustomerRoleIds.Add(registeredRole.Id);
 
@@ -645,9 +656,9 @@ namespace Nop.Web.Areas.Admin.Factories
                         Email = customer.IsRegistered() ? customer.Email : _localizationService.GetResource("Admin.Customers.Guest"),
                         Username = customer.Username,
                         FullName = customer.GetFullName(),
-                        Company = customer.GetAttribute<string>(SystemCustomerAttributeNames.Company),
-                        Phone = customer.GetAttribute<string>(SystemCustomerAttributeNames.Phone),
-                        ZipPostalCode = customer.GetAttribute<string>(SystemCustomerAttributeNames.ZipPostalCode),
+                        Company = customer.GetAttribute<string>(NopCustomerDefaults.CompanyAttribute),
+                        Phone = customer.GetAttribute<string>(NopCustomerDefaults.PhoneAttribute),
+                        ZipPostalCode = customer.GetAttribute<string>(NopCustomerDefaults.ZipPostalCodeAttribute),
                         Active = customer.Active
                     };
 
@@ -659,7 +670,7 @@ namespace Nop.Web.Areas.Admin.Factories
                     customerModel.CustomerRoleNames = string.Join(", ", customer.CustomerRoles.Select(role => role.Name));
                     if (_customerSettings.AllowCustomersToUploadAvatars)
                     {
-                        var avatarPictureId = customer.GetAttribute<int>(SystemCustomerAttributeNames.AvatarPictureId);
+                        var avatarPictureId = customer.GetAttribute<int>(NopCustomerDefaults.AvatarPictureIdAttribute);
                         customerModel.AvatarUrl = _pictureService.GetPictureUrl(avatarPictureId, _mediaSettings.AvatarPictureSize,
                             _customerSettings.DefaultAvatarEnabled, defaultPictureType: PictureType.Avatar);
                     }
@@ -692,6 +703,7 @@ namespace Nop.Web.Areas.Admin.Factories
                     _customerSettings.UserRegistrationType == UserRegistrationType.AdminApproval;
                 model.AllowReSendingOfActivationMessage = customer.IsRegistered() && !customer.Active &&
                     _customerSettings.UserRegistrationType == UserRegistrationType.EmailValidation;
+                model.GdprEnabled = _gdprSettings.GdprEnabled;
 
                 //whether to fill in some of properties
                 if (!excludeProperties)
@@ -702,30 +714,30 @@ namespace Nop.Web.Areas.Admin.Factories
                     model.AdminComment = customer.AdminComment;
                     model.IsTaxExempt = customer.IsTaxExempt;
                     model.Active = customer.Active;
-                    model.FirstName = customer.GetAttribute<string>(SystemCustomerAttributeNames.FirstName);
-                    model.LastName = customer.GetAttribute<string>(SystemCustomerAttributeNames.LastName);
-                    model.Gender = customer.GetAttribute<string>(SystemCustomerAttributeNames.Gender);
-                    model.DateOfBirth = customer.GetAttribute<DateTime?>(SystemCustomerAttributeNames.DateOfBirth);
-                    model.Company = customer.GetAttribute<string>(SystemCustomerAttributeNames.Company);
-                    model.StreetAddress = customer.GetAttribute<string>(SystemCustomerAttributeNames.StreetAddress);
-                    model.StreetAddress2 = customer.GetAttribute<string>(SystemCustomerAttributeNames.StreetAddress2);
-                    model.ZipPostalCode = customer.GetAttribute<string>(SystemCustomerAttributeNames.ZipPostalCode);
-                    model.City = customer.GetAttribute<string>(SystemCustomerAttributeNames.City);
-                    model.County = customer.GetAttribute<string>(SystemCustomerAttributeNames.County);
-                    model.CountryId = customer.GetAttribute<int>(SystemCustomerAttributeNames.CountryId);
-                    model.StateProvinceId = customer.GetAttribute<int>(SystemCustomerAttributeNames.StateProvinceId);
-                    model.Phone = customer.GetAttribute<string>(SystemCustomerAttributeNames.Phone);
-                    model.Fax = customer.GetAttribute<string>(SystemCustomerAttributeNames.Fax);
-                    model.TimeZoneId = customer.GetAttribute<string>(SystemCustomerAttributeNames.TimeZoneId);
-                    model.VatNumber = customer.GetAttribute<string>(SystemCustomerAttributeNames.VatNumber);
+                    model.FirstName = customer.GetAttribute<string>(NopCustomerDefaults.FirstNameAttribute);
+                    model.LastName = customer.GetAttribute<string>(NopCustomerDefaults.LastNameAttribute);
+                    model.Gender = customer.GetAttribute<string>(NopCustomerDefaults.GenderAttribute);
+                    model.DateOfBirth = customer.GetAttribute<DateTime?>(NopCustomerDefaults.DateOfBirthAttribute);
+                    model.Company = customer.GetAttribute<string>(NopCustomerDefaults.CompanyAttribute);
+                    model.StreetAddress = customer.GetAttribute<string>(NopCustomerDefaults.StreetAddressAttribute);
+                    model.StreetAddress2 = customer.GetAttribute<string>(NopCustomerDefaults.StreetAddress2Attribute);
+                    model.ZipPostalCode = customer.GetAttribute<string>(NopCustomerDefaults.ZipPostalCodeAttribute);
+                    model.City = customer.GetAttribute<string>(NopCustomerDefaults.CityAttribute);
+                    model.County = customer.GetAttribute<string>(NopCustomerDefaults.CountyAttribute);
+                    model.CountryId = customer.GetAttribute<int>(NopCustomerDefaults.CountryIdAttribute);
+                    model.StateProvinceId = customer.GetAttribute<int>(NopCustomerDefaults.StateProvinceIdAttribute);
+                    model.Phone = customer.GetAttribute<string>(NopCustomerDefaults.PhoneAttribute);
+                    model.Fax = customer.GetAttribute<string>(NopCustomerDefaults.FaxAttribute);
+                    model.TimeZoneId = customer.GetAttribute<string>(NopCustomerDefaults.TimeZoneIdAttribute);
+                    model.VatNumber = customer.GetAttribute<string>(NopCustomerDefaults.VatNumberAttribute);
                     model.VatNumberStatusNote = ((VatNumberStatus)customer
-                        .GetAttribute<int>(SystemCustomerAttributeNames.VatNumberStatusId))
+                        .GetAttribute<int>(NopCustomerDefaults.VatNumberStatusIdAttribute))
                         .GetLocalizedEnum(_localizationService, _workContext);
                     model.CreatedOn = _dateTimeHelper.ConvertToUserTime(customer.CreatedOnUtc, DateTimeKind.Utc);
                     model.LastActivityDate = _dateTimeHelper.ConvertToUserTime(customer.LastActivityDateUtc, DateTimeKind.Utc);
                     model.LastIpAddress = customer.LastIpAddress;
-                    model.LastVisitedPage = customer.GetAttribute<string>(SystemCustomerAttributeNames.LastVisitedPage);
-                    model.SelectedCustomerRoleIds = customer.CustomerRoles.Select(role => role.Id).ToList();
+                    model.LastVisitedPage = customer.GetAttribute<string>(NopCustomerDefaults.LastVisitedPageAttribute);
+                    model.SelectedCustomerRoleIds = customer.CustomerCustomerRoleMappings.Select(mapping => mapping.CustomerRoleId).ToList();
                     model.RegisteredInStore = _storeService.GetAllStores()
                         .FirstOrDefault(store => store.Id == customer.RegisteredInStoreId)?.Name ?? string.Empty;
 
@@ -745,12 +757,6 @@ namespace Nop.Web.Areas.Admin.Factories
                             .Select(store => store.Id).ToList();
                     }
                 }
-
-                //precheck Registered Role as a default role while creating a new customer through admin
-                var registeredRole = _customerService.GetCustomerRoleBySystemName(SystemCustomerRoleNames.Registered);
-                if (registeredRole != null)
-                    model.SelectedCustomerRoleIds.Add(registeredRole.Id);
-
                 //prepare reward points model
                 model.DisplayRewardPointsHistory = _rewardPointsSettings.Enabled;
                 if (model.DisplayRewardPointsHistory)
@@ -766,6 +772,17 @@ namespace Nop.Web.Areas.Admin.Factories
                 PrepareCustomerShoppingCartSearchModel(model.CustomerShoppingCartSearchModel, customer);
                 PrepareCustomerActivityLogSearchModel(model.CustomerActivityLogSearchModel, customer);
                 PrepareCustomerBackInStockSubscriptionSearchModel(model.CustomerBackInStockSubscriptionSearchModel, customer);
+            }
+            else
+            {
+                //whether to fill in some of properties
+                if (!excludeProperties)
+                {
+                    //precheck Registered Role as a default role while creating a new customer through admin
+                    var registeredRole = _customerService.GetCustomerRoleBySystemName(NopCustomerDefaults.RegisteredRoleName);
+                    if (registeredRole != null)
+                        model.SelectedCustomerRoleIds.Add(registeredRole.Id);
+                }
             }
 
             model.UsernamesEnabled = _customerSettings.UsernamesEnabled;
@@ -896,7 +913,7 @@ namespace Nop.Web.Areas.Admin.Factories
                 Data = addresses.PaginationByRequestModel(searchModel).Select(address =>
                 {
                     //fill in model values from the entity        
-                    var addressModel = address.ToModel();
+                    var addressModel = address.ToModel<AddressModel>();
 
                     //fill in additional values (not existing in the entity)
                     PrepareModelAddressHtml(addressModel, address);
@@ -930,7 +947,7 @@ namespace Nop.Web.Areas.Admin.Factories
 
                 //whether to fill in some of properties
                 if (!excludeProperties)
-                    model.Address = address.ToModel();
+                    model.Address = address.ToModel(model.Address);
             }
 
             model.CustomerId = customer.Id;
@@ -1305,12 +1322,87 @@ namespace Nop.Web.Areas.Admin.Factories
                         ? customer.LastIpAddress : _localizationService.GetResource("Admin.Customers.OnlineCustomers.Fields.IPAddress.Disabled");
                     customerModel.Location = _geoLookupService.LookupCountryName(customer.LastIpAddress);
                     customerModel.LastVisitedPage = _customerSettings.StoreLastVisitedPage 
-                        ? customer.GetAttribute<string>(SystemCustomerAttributeNames.LastVisitedPage) 
+                        ? customer.GetAttribute<string>(NopCustomerDefaults.LastVisitedPageAttribute) 
                         : _localizationService.GetResource("Admin.Customers.OnlineCustomers.Fields.LastVisitedPage.Disabled");
 
                     return customerModel;
                 }),
                 Total = customers.TotalCount
+            };
+
+            return model;
+        }
+
+        /// <summary>
+        /// Prepare GDPR request (log) search model
+        /// </summary>
+        /// <param name="searchModel">GDPR request search model</param>
+        /// <returns>GDPR request search model</returns>
+        public virtual GdprLogSearchModel PrepareGdprLogSearchModel(GdprLogSearchModel searchModel)
+        {
+            if (searchModel == null)
+                throw new ArgumentNullException(nameof(searchModel));
+
+            //prepare request types
+            _baseAdminModelFactory.PrepareGdprRequestTypes(searchModel.AvailableRequestTypes);
+
+            //prepare page parameters
+            searchModel.SetGridPageSize();
+
+            return searchModel;
+        }
+
+        /// <summary>
+        /// Prepare paged GDPR request list model
+        /// </summary>
+        /// <param name="searchModel">GDPR request search model</param>
+        /// <returns>GDPR request list model</returns>
+        public virtual GdprLogListModel PrepareGdprLogListModel(GdprLogSearchModel searchModel)
+        {
+            if (searchModel == null)
+                throw new ArgumentNullException(nameof(searchModel));
+
+            var customerId = 0;
+            var customerInfo = "";
+            if (!String.IsNullOrEmpty(searchModel.SearchEmail))
+            {
+                var customer = _customerService.GetCustomerByEmail(searchModel.SearchEmail);
+                if (customer != null)
+                    customerId = customer.Id;
+                else
+                {
+                    customerInfo = searchModel.SearchEmail;
+                }
+            }
+            //get requests
+            var gdprLog = _gdprService.GetAllLog(
+                customerId : customerId,
+                customerInfo: customerInfo,
+                requestType: searchModel.SearchRequestTypeId > 0 ? (GdprRequestType?)searchModel.SearchRequestTypeId : null,
+                pageIndex: searchModel.Page - 1, 
+                pageSize: searchModel.PageSize);
+
+            //prepare list model
+            var model = new GdprLogListModel
+            {
+                Data = gdprLog.Select(log =>
+                {
+                    //fill in model values from the entity
+                    var customer = _customerService.GetCustomerById(log.CustomerId);
+
+                    var requestModel = new GdprLogModel
+                    {
+                        Id = log.Id,
+                        CustomerInfo = customer != null && !customer.Deleted && !String.IsNullOrEmpty(customer.Email) ? 
+                            customer.Email : 
+                            log.CustomerInfo,
+                        RequestType = log.RequestType.GetLocalizedEnum(_localizationService, _workContext),
+                        RequestDetails = log.RequestDetails,
+                        CreatedOn = _dateTimeHelper.ConvertToUserTime(log.CreatedOnUtc, DateTimeKind.Utc)
+                    };
+                    return requestModel;
+                }),
+                Total = gdprLog.TotalCount
             };
 
             return model;
